@@ -45,7 +45,7 @@ public class AstarPathfinding : MonoBehaviour
         {
             for (int y = 0; y < tileboardReference.H; y++)
             {
-                worldTile thisTile = tileboardReference.tiles[x, y];
+                Tilescript thisTile = tileboardReference.tilescripts[x, y];
                 tiles[x,y] = new tileCord(x, y, thisTile.passable);
             }
         }

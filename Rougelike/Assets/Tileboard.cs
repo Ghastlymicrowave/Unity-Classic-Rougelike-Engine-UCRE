@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class worldTile
+/*
+public class worldTile //world tile will eventually be used to save/load tile data that is loaded into the Tilescript
 {
     public worldTile(bool passable)
     {
@@ -15,12 +16,11 @@ public class worldTile
         set { passable_ = value; }
     }
 }
-
-
+*/
 
 public class Tileboard : MonoBehaviour
 {
-    public worldTile[,] tiles;
+    //public worldTile[,] tiles;
     public Tilescript[,] tilescripts;
     public GameObject[,] tileObjs;
     public int W = 20;
@@ -103,7 +103,9 @@ public class Tileboard : MonoBehaviour
         testItem.Set(0, "test item", true, "fat");
 
         InstantiateItem(playerActor.x, playerActor.y, testItem);
-        
+        InstantiateItem(playerActor.x+1, playerActor.y, testItem);
+        InstantiateItem(playerActor.x-1, playerActor.y, testItem);
+
     }
 
     public void RotationTick()
@@ -136,7 +138,7 @@ public class Tileboard : MonoBehaviour
         wallMat_cracked_light.mainTexture = assetBundleLoader.getTexture("wall_cracked_light");
         wallMat_cracked_lighter.mainTexture = assetBundleLoader.getTexture("wall_cracked_lighter");
 
-        tiles = new worldTile[width,height];
+        //tiles = new worldTile[width,height];
         tileObjs = new GameObject[width, height];
         tilescripts = new Tilescript[width, height];
 
@@ -147,7 +149,7 @@ public class Tileboard : MonoBehaviour
 
                 if (Random.Range(0f, 1f) > 0.75f && (x!=Mathf.RoundToInt(W / 2)&&y!= Mathf.RoundToInt(H / 2)))
                 {//impassable wall
-                    tiles[x, y] = new worldTile(false);
+                    //tiles[x, y] = new worldTile(false);
                     tileObjs[x, y] = Instantiate(assetBundleLoader.getPrefab("wall"));
                     
                     switch (Random.Range(0, 3))
@@ -178,7 +180,7 @@ public class Tileboard : MonoBehaviour
                 }
                 else
                 {//passable
-                    tiles[x, y] = new worldTile(true);
+                    //tiles[x, y] = new worldTile(true);
                     tileObjs[x, y] = Instantiate(assetBundleLoader.getPrefab("tileobject")); //Instantiate(tilePrefab);
 
                     Sprite tileSprite;
@@ -211,7 +213,8 @@ public class Tileboard : MonoBehaviour
                     tilescripts[x, y] = thisTilescript;
                 }
 
-                
+                tilescripts[x, y].vison = Tilescript.visionState.hidden;
+
             }
         }
 
@@ -337,7 +340,7 @@ public class Tileboard : MonoBehaviour
                 if (hit.transform!= null)
                 {
                     Tilescript hitScript = hit.transform.gameObject.GetComponent<Tilescript>();
-                    if (hitScript!= null && hitScript.passable)
+                    if (hitScript != null && hitScript.passable && hitScript.vison != Tilescript.visionState.unknown)
                     {
                         aStar.UpdatePathfinder();
                         playerActor.pathfindingInstruction = aStar.fullPathfind(playerActor.x,playerActor.y,hitScript.x,hitScript.y);
@@ -348,11 +351,46 @@ public class Tileboard : MonoBehaviour
             }
         }
 
+        if (Input.GetMouseButtonDown(1))
+        {
+            RaycastHit hit;
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out hit, 500f))
+            {
+                if (hit.transform != null)
+                {
+                    Tilescript hitScript = hit.transform.gameObject.GetComponent<Tilescript>();
+                    if (hitScript != null && hitScript.itemsOnTile!=null && hitScript.itemsOnTile.items.Count > 0 && hitScript.vison == Tilescript.visionState.visible)
+                    {
+                        string printstring = "This tile contains:\n";
+                        List<InventoryItem> items = hitScript.itemsOnTile.items;
+                        for (int i = 0; i < items.Count; i++)
+                        {
+                            printstring += items[i].name + "\n"; 
+                        }
+                        print(printstring);
+                    }
+                }
+            }
+        }
+
+        if (Input.GetKeyDown(KeyCode.I))
+        {
+            playerActor.PickupItemOnTile(0);
+            print(playerActor.inventory.Count);
+        }
+
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            playerActor.DropItemOnTile(0);
+            print(playerActor.inventory.Count);
+        }
+
     }
 
     public void setTileColor(int x, int y, Color c)
     {
-        if (tiles[x, y].passable)
+        if (tilescripts[x, y].passable)
         {
             tilescripts[x, y].thisSprite.color = c;
         }
@@ -390,6 +428,7 @@ public class Tileboard : MonoBehaviour
             {
                 newVisibleTiles.Add(tile);
                 setTileColor(tile.x, tile.y, Color.white);
+                tilescripts[tile.x, tile.y].vison = Tilescript.visionState.visible;
             }
         }
 
@@ -398,6 +437,7 @@ public class Tileboard : MonoBehaviour
             if (!newVisibleTiles.Contains(playerVisibleTiles[i]))
             {
                 setTileColor(playerVisibleTiles[i].x, playerVisibleTiles[i].y, Color.grey);
+                tilescripts[playerVisibleTiles[i].x, playerVisibleTiles[i].y].vison = Tilescript.visionState.hidden;
             }
         }
 
@@ -481,12 +521,25 @@ public class Tileboard : MonoBehaviour
 
     public GameObject InstantiateItem(int x, int y, InventoryItem item)
     {
-        GameObject spawn = Instantiate( assetBundleLoader.getPrefab("TileItem"));
-        TileItem spawnedItem = spawn.GetComponent<TileItem>();
-        spawnedItem.set(item, x, y, this);
-        spawn.transform.SetParent(this.transform);
-        spawn.transform.localPosition = new Vector3((float)x, (float)y, -0.5f);
-        tilescripts[x, y].itemsOnTile.Add(spawnedItem);
-        return spawn;
+        if (tilescripts[x,y].itemsOnTile != null)
+        {
+            //obj exists, add to it
+            tilescripts[x, y].itemsOnTile.items.Add(item.ItemClone());
+            return tilescripts[x, y].itemsOnTile.gameObject;
+        }
+        else
+        {
+            //obj doesn't exist, create it
+            GameObject spawn = Instantiate(assetBundleLoader.getPrefab("TileItem"));
+            TileItem spawnedItem = spawn.GetComponent<TileItem>();
+            spawnedItem.set(item, x, y, this);
+            spawn.transform.SetParent(this.transform);
+            spawn.transform.localPosition = new Vector3((float)x, (float)y, -0.5f);
+            tilescripts[x, y].itemsOnTile = spawnedItem;
+            return spawn;
+        }
+
+
+        
     }
 }

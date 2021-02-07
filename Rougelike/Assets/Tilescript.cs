@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class Tilescript : MonoBehaviour
 {
     public int x;
@@ -13,7 +12,14 @@ public class Tilescript : MonoBehaviour
     public SpriteRenderer thisSprite;
     public MeshRenderer thisMesh;
     public tileActor actorOnTile;
-    public List<TileItem> itemsOnTile;
+    public TileItem itemsOnTile;
+    public enum visionState
+    {
+        unknown,
+        hidden,
+        visible
+    }
+    public visionState vison;
     public void Set(int xPos, int yPos, bool isPassable)
     {
         x = xPos;
@@ -31,7 +37,7 @@ public class Tilescript : MonoBehaviour
             thisMesh = GetComponent<MeshRenderer>();
             thisMesh.enabled = false;
         }
-        itemsOnTile = new List<TileItem>();
+        
 
     }
 

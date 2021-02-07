@@ -84,7 +84,7 @@ public class tileActor
     {
         newXCord = Mathf.Clamp(newXCord, 0, tileboardReference.W - 1);
         newYCord = Mathf.Clamp(newYCord, 0, tileboardReference.H - 1);
-        if (tileboardReference.tiles[newXCord, newYCord].passable)
+        if (tileboardReference.tilescripts[newXCord, newYCord].passable)
         {
             xCord = newXCord;
             yCord = newYCord;
@@ -124,36 +124,36 @@ public class tileActor
         switch (direction)
         {
             case Tileboard.direction.N:
-                if (PositionOnTileboardValid(xCord, yCord + 1) && tileboardReference.tiles[xCord, yCord + 1].passable)
+                if (PositionOnTileboardValid(xCord, yCord + 1) && tileboardReference.tilescripts[xCord, yCord + 1].passable)
                 {
                     yCord += 1;
                     ReloadPosition();
                 }
                 break;
             case Tileboard.direction.E:
-                if (PositionOnTileboardValid(xCord + 1, yCord) && tileboardReference.tiles[xCord + 1, yCord].passable)
+                if (PositionOnTileboardValid(xCord + 1, yCord) && tileboardReference.tilescripts[xCord + 1, yCord].passable)
                 {
                     xCord += 1;
                     ReloadPosition();
                 }
                 break;
             case Tileboard.direction.S:
-                if (PositionOnTileboardValid(xCord, yCord - 1) && tileboardReference.tiles[xCord, yCord - 1].passable)
+                if (PositionOnTileboardValid(xCord, yCord - 1) && tileboardReference.tilescripts[xCord, yCord - 1].passable)
                 {
                     yCord -= 1;
                     ReloadPosition();
                 }
                 break;
             case Tileboard.direction.W:
-                if (PositionOnTileboardValid(xCord - 1, yCord) && tileboardReference.tiles[xCord - 1, yCord].passable)
+                if (PositionOnTileboardValid(xCord - 1, yCord) && tileboardReference.tilescripts[xCord - 1, yCord].passable)
                 {
                     xCord -= 1;
                     ReloadPosition();
                 }
                 break;
             case Tileboard.direction.NE:
-                if (PositionOnTileboardValid(xCord + 1, yCord + 1) && tileboardReference.tiles[xCord + 1, yCord + 1].passable &&
-                    (tileboardReference.tiles[xCord, yCord + 1].passable || tileboardReference.tiles[xCord + 1, yCord].passable))
+                if (PositionOnTileboardValid(xCord + 1, yCord + 1) && tileboardReference.tilescripts[xCord + 1, yCord + 1].passable &&
+                    (tileboardReference.tilescripts[xCord, yCord + 1].passable || tileboardReference.tilescripts[xCord + 1, yCord].passable))
 
                 {
                     yCord += 1;
@@ -162,8 +162,8 @@ public class tileActor
                 }
                 break;
             case Tileboard.direction.SE:
-                if (PositionOnTileboardValid(xCord + 1, yCord - 1) && tileboardReference.tiles[xCord + 1, yCord - 1].passable &&
-                    (tileboardReference.tiles[xCord, yCord - 1].passable || tileboardReference.tiles[xCord + 1, yCord].passable)
+                if (PositionOnTileboardValid(xCord + 1, yCord - 1) && tileboardReference.tilescripts[xCord + 1, yCord - 1].passable &&
+                    (tileboardReference.tilescripts[xCord, yCord - 1].passable || tileboardReference.tilescripts[xCord + 1, yCord].passable)
                      )
                 {
                     yCord -= 1;
@@ -172,8 +172,8 @@ public class tileActor
                 }
                 break;
             case Tileboard.direction.SW:
-                if (PositionOnTileboardValid(xCord - 1, yCord - 1) && tileboardReference.tiles[xCord - 1, yCord - 1].passable &&
-                    (tileboardReference.tiles[xCord, yCord - 1].passable || tileboardReference.tiles[xCord - 1, yCord].passable)
+                if (PositionOnTileboardValid(xCord - 1, yCord - 1) && tileboardReference.tilescripts[xCord - 1, yCord - 1].passable &&
+                    (tileboardReference.tilescripts[xCord, yCord - 1].passable || tileboardReference.tilescripts[xCord - 1, yCord].passable)
                      )
                 {
                     yCord -= 1;
@@ -182,8 +182,8 @@ public class tileActor
                 }
                 break;
             case Tileboard.direction.NW:
-                if (PositionOnTileboardValid(xCord - 1, yCord + 1) && tileboardReference.tiles[xCord - 1, yCord + 1].passable &&
-                    (tileboardReference.tiles[xCord, yCord + 1].passable || tileboardReference.tiles[xCord - 1, yCord].passable)
+                if (PositionOnTileboardValid(xCord - 1, yCord + 1) && tileboardReference.tilescripts[xCord - 1, yCord + 1].passable &&
+                    (tileboardReference.tilescripts[xCord, yCord + 1].passable || tileboardReference.tilescripts[xCord - 1, yCord].passable)
                      )
                 {
                     yCord += 1;
@@ -237,14 +237,40 @@ public class tileActor
 
     public void PickupItemOnTile(int index)
     {
-        List<TileItem> items = tileboardReference.tilescripts[x, y].itemsOnTile;
+        if (tileboardReference.tilescripts[x, y].itemsOnTile == null)
+        {
+            Debug.Log("nothing to pick up");
+            return;
+        }
+        List<InventoryItem> items = tileboardReference.tilescripts[x, y].itemsOnTile.items;
         if (items.Count > 0 && items.Count > index)
         {
-            inventory.Add(items[index].item.ItemClone());
-            GameObject toRemove = tileboardReference.tilescripts[x, y].itemsOnTile[index].gameObject;
-            tileboardReference.tilescripts[x, y].itemsOnTile.RemoveAt(index);
-            GameObject.Destroy(toRemove);
+            inventory.Add(items[index].ItemClone());
+
+            if (items.Count == 1)
+            {
+                GameObject toRemove = tileboardReference.tilescripts[x, y].itemsOnTile.gameObject;
+                tileboardReference.tilescripts[x, y].itemsOnTile.items.RemoveAt(index);
+                GameObject.Destroy(toRemove);
+            }
+            else
+            {
+                tileboardReference.tilescripts[x, y].itemsOnTile.items.RemoveAt(index);
+            }
+
+           
         }
+    }
+
+    public void DropItemOnTile(int index)
+    {
+        if (index >= inventory.Count)
+        {
+            Debug.Log("nothing to drop");
+            return;
+        }
+        tileboardReference.InstantiateItem(x, y, inventory[index]);
+        inventory.RemoveAt(index);
     }
 
     public void Killed()

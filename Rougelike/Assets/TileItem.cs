@@ -4,14 +4,15 @@ using UnityEngine;
 
 public class TileItem : MonoBehaviour
 {
-    public InventoryItem item;
+    public List<InventoryItem> items;
     Tileboard tileboardReference;
     int xCord;
     int yCord;
 
     public void set(InventoryItem newItem, int x, int y, Tileboard tileboard)
     {
-        item = newItem.ItemClone();
+        items = new List<InventoryItem>();
+        items.Add(newItem.ItemClone());
         xCord = x;
         yCord = y;
         tileboardReference = tileboard;
