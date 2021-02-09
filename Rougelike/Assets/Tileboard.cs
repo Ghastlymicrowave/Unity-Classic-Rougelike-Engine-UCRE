@@ -222,6 +222,11 @@ public class Tileboard : MonoBehaviour
         aStar.Init(this);
     }
 
+    public void TickAllAutomatedActors()
+    {
+        //tick all non-manual actors
+    }
+
     private void Update()
     {
 
@@ -266,45 +271,61 @@ public class Tileboard : MonoBehaviour
 
             if (Input.GetKeyDown(KeyCode.Keypad1))
             {
-                playerActor.MoveDirection(direction.SW);
+                if (playerActor.MoveDirection(direction.SW) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
             if (Input.GetKeyDown(KeyCode.Keypad2))
             {
-                playerActor.MoveDirection(direction.S);
+                if (playerActor.MoveDirection(direction.S) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
             if (Input.GetKeyDown(KeyCode.Keypad3))
             {
-                playerActor.MoveDirection(direction.SE);
+                if (playerActor.MoveDirection(direction.SE) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
             if (Input.GetKeyDown(KeyCode.Keypad4))
             {
-                playerActor.MoveDirection(direction.W);
+                if (playerActor.MoveDirection(direction.W) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
             if (Input.GetKeyDown(KeyCode.Keypad6))
             {
-                playerActor.MoveDirection(direction.E);
+                if (playerActor.MoveDirection(direction.E) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
             if (Input.GetKeyDown(KeyCode.Keypad7))
             {
-                playerActor.MoveDirection(direction.NW);
+                if (playerActor.MoveDirection(direction.NW) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
             if (Input.GetKeyDown(KeyCode.Keypad8))
             {
-                playerActor.MoveDirection(direction.N);
+                if (playerActor.MoveDirection(direction.N) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
             if (Input.GetKeyDown(KeyCode.Keypad9))
             {
-                playerActor.MoveDirection(direction.NE);
+                if (playerActor.MoveDirection(direction.NE) == 1) {
+                    TickAllAutomatedActors();
+                }
                 CalculateVisibility(5f);
             }
-            //TODO: TICK ALL OTHER ACTORS HERE
+            
         }
         else
         {//pathfinding
@@ -320,6 +341,8 @@ public class Tileboard : MonoBehaviour
                 {
                     playerActor.PathfindTick();
                     CalculateVisibility(5f);
+
+                    TickAllAutomatedActors();
                 }
             }
             else
@@ -330,8 +353,7 @@ public class Tileboard : MonoBehaviour
 
         RotationTick();
         
-        
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0))//left click moves to tile
         {
             RaycastHit hit;
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -351,7 +373,7 @@ public class Tileboard : MonoBehaviour
             }
         }
 
-        if (Input.GetMouseButtonDown(1))
+        if (Input.GetMouseButtonDown(1))//right click displays items
         {
             RaycastHit hit;
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -374,13 +396,13 @@ public class Tileboard : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.I))
+        if (Input.GetKeyDown(KeyCode.I))//pick up item
         {
             playerActor.PickupItemOnTile(0);
             print(playerActor.inventory.Count);
         }
 
-        if (Input.GetKeyDown(KeyCode.K))
+        if (Input.GetKeyDown(KeyCode.K))//drop item
         {
             playerActor.DropItemOnTile(0);
             print(playerActor.inventory.Count);
@@ -537,9 +559,6 @@ public class Tileboard : MonoBehaviour
             spawn.transform.localPosition = new Vector3((float)x, (float)y, -0.5f);
             tilescripts[x, y].itemsOnTile = spawnedItem;
             return spawn;
-        }
-
-
-        
+        }     
     }
 }
