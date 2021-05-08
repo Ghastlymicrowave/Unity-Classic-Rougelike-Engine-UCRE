@@ -19,7 +19,7 @@ public class Tilescript : MonoBehaviour
         hidden,
         visible
     }
-    public visionState vison;
+    public visionState vison = visionState.unknown;
     public void Set(int xPos, int yPos, bool isPassable)
     {
         x = xPos;

@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 /*
 public class worldTile //world tile will eventually be used to save/load tile data that is loaded into the Tilescript
@@ -18,6 +19,8 @@ public class worldTile //world tile will eventually be used to save/load tile da
 }
 */
 
+//TODO: add an x and y position camera target for panning
+
 public class Tileboard : MonoBehaviour
 {
     //public worldTile[,] tiles;
@@ -25,6 +28,9 @@ public class Tileboard : MonoBehaviour
     public GameObject[,] tileObjs;
     public int W = 20;
     public int H = 20;
+    [Range(1f, 40f)] public float cameraMoveSpeed = 4f;
+    [Range(1f, 40f)] public float cameraZoomSpeed = 4f;
+    [Range(0.001f, 1f)] public float cameraZoomSmooth = 0.01f;
     LoadAssetBundles assetBundleLoader;
     GameObject mainCamera;
     tileActor playerActor;
@@ -45,10 +51,22 @@ public class Tileboard : MonoBehaviour
     //x+ is right
     //y+ is down
 
+    Vector2 dragOffset = Vector2.zero;
+    Vector2 targetDragOffset = Vector2.zero;
+
+    public float panMult = 1f;
+    public bool acceptingInput = true;
+
     List<Tilescript> playerVisibleTiles;
 
-    public enum direction 
-    { 
+    public Action<List<InventoryItem>> inventoryUpdated = (List<InventoryItem> iv) => { };
+
+    Vector3 clickPosition = Vector3.zero;
+    bool dragging = false;
+    public float maximumDragDistance = 1f;
+
+    public enum direction
+    {
         N,
         NE,
         E,
@@ -59,10 +77,16 @@ public class Tileboard : MonoBehaviour
         NW
     }
 
+    IEnumerator Setup()
+    {
+        yield return new WaitForSeconds(0.5f);
+        inventoryUpdated(playerActor.inventory);
+    }
+
     void Start()
     {
         playerVisibleTiles = new List<Tilescript>();
-        switch (Random.Range(0, 5))
+        switch (UnityEngine.Random.Range(0, 5))
         {
             case 0: globalColor = Color.red;
                 break;
@@ -79,11 +103,12 @@ public class Tileboard : MonoBehaviour
                 globalColor = Color.cyan;
                 break;
         }
+        
         aStar = GetComponent<AstarPathfinding>();
         assetBundleLoader = GetComponent<LoadAssetBundles>();
         InitalizeBlankTileboard(W, H);
         mainCamera = GameObject.Find("MainCamera");
-        playerActor = CreateTileActor (Mathf.RoundToInt(W / 2), Mathf.RoundToInt(H / 2), assetBundleLoader.getSprite("mans"));
+        playerActor = CreateTileActor(Mathf.RoundToInt(W / 2), Mathf.RoundToInt(H / 2), assetBundleLoader.getSprite("mans"));
         mainCamera.transform.position = playerActor.gameObject.transform.position + new Vector3(0f, 0f, -5f);
 
         cameraTarget = new GameObject("cam Target");
@@ -103,28 +128,30 @@ public class Tileboard : MonoBehaviour
         testItem.Set(0, "test item", true, "fat");
 
         InstantiateItem(playerActor.x, playerActor.y, testItem);
-        InstantiateItem(playerActor.x+1, playerActor.y, testItem);
-        InstantiateItem(playerActor.x-1, playerActor.y, testItem);
+        InstantiateItem(playerActor.x + 1, playerActor.y, testItem);
+        InstantiateItem(playerActor.x - 1, playerActor.y, testItem);
 
+        StartCoroutine("Setup");
     }
 
     public void RotationTick()
     {
-        currentXrot = Mathf.Lerp(currentXrot, targetXrot, 0.01f);
+        currentXrot = Mathf.Lerp(currentXrot, targetXrot, cameraZoomSmooth);
         float t = currentXrot / -90.1f;
-        cameraTarget.transform.localPosition = new Vector3(0f, 0f, Mathf.Lerp(-10, -1, t));
-        playerActor.gameObject.transform.rotation = Quaternion.Lerp(playerActor.gameObject.transform.rotation, Quaternion.Euler(currentXrot, 0f, 0f), 5f * Time.deltaTime);
-        mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, cameraTarget.transform.position, 3f * Time.deltaTime);
-        mainCamera.transform.rotation = Quaternion.Lerp(mainCamera.transform.rotation, Quaternion.Euler(currentXrot, 0f, 0f), 5f * Time.deltaTime);
+        cameraTarget.transform.localPosition = new Vector3(0f,0f, Mathf.Lerp(-10, -1, t));
+        cameraTarget.transform.position += new Vector3(-dragOffset.x, -dragOffset.y, 0f);
+        playerActor.gameObject.transform.rotation = Quaternion.Lerp(playerActor.gameObject.transform.rotation, Quaternion.Euler(currentXrot, 0f, 0f), cameraZoomSpeed * Time.deltaTime);
+        mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, cameraTarget.transform.position, cameraMoveSpeed * Time.deltaTime);
+        mainCamera.transform.rotation = Quaternion.Lerp(mainCamera.transform.rotation, Quaternion.Euler(currentXrot, 0f, 0f), cameraZoomSpeed * Time.deltaTime);
     }
 
     public tileActor CreateTileActor(int xPos, int yPos, Sprite image)
     {
-        
-        tileActor toReturn = new tileActor(xPos,yPos,image, Instantiate(assetBundleLoader.getPrefab("tileactor")),this,3,3,3,3,3);
+
+        tileActor toReturn = new tileActor(xPos, yPos, image, Instantiate(assetBundleLoader.getPrefab("tileactor")), this, 3, 3, 3, 3, 3);
         toReturn.tileActorScript = toReturn.gameObject.GetComponent<TileActorScript>();
         SpriteRenderer actorRenderer = toReturn.gameObject.GetComponent<SpriteRenderer>();
-            actorRenderer.sprite = image;
+        actorRenderer.sprite = image;
         actorRenderer.color = globalColor;
         return toReturn;
     }
@@ -142,17 +169,17 @@ public class Tileboard : MonoBehaviour
         tileObjs = new GameObject[width, height];
         tilescripts = new Tilescript[width, height];
 
-        for (int y = 0; y< height; y++)
+        for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width; x++)
             {
 
-                if (Random.Range(0f, 1f) > 0.75f && (x!=Mathf.RoundToInt(W / 2)&&y!= Mathf.RoundToInt(H / 2)))
+                if (UnityEngine.Random.Range(0f, 1f) > 0.75f && (x != Mathf.RoundToInt(W / 2) && y != Mathf.RoundToInt(H / 2)))
                 {//impassable wall
                     //tiles[x, y] = new worldTile(false);
                     tileObjs[x, y] = Instantiate(assetBundleLoader.getPrefab("wall"));
-                    
-                    switch (Random.Range(0, 3))
+
+                    switch (UnityEngine.Random.Range(0, 3))
                     {
                         case 0:
                             tileObjs[x, y].GetComponent<Renderer>().material = wallMat_cracked;
@@ -172,8 +199,8 @@ public class Tileboard : MonoBehaviour
                     tileObjs[x, y].transform.localPosition = new Vector3(x, y, -0.5f);
                     tileObjs[x, y].GetComponent<Renderer>().material.color = Color.black;
                     Tilescript thisTilescript = tileObjs[x, y].GetComponent<Tilescript>();
-                    
-                    
+
+
                     thisTilescript.Set(x, y, false);
                     tilescripts[x, y] = tileObjs[x, y].GetComponent<Tilescript>();
 
@@ -184,7 +211,7 @@ public class Tileboard : MonoBehaviour
                     tileObjs[x, y] = Instantiate(assetBundleLoader.getPrefab("tileobject")); //Instantiate(tilePrefab);
 
                     Sprite tileSprite;
-                    switch (Random.Range(0, 4))
+                    switch (UnityEngine.Random.Range(0, 4))
                     {
                         case 0:
                             tileSprite = assetBundleLoader.getSprite("speckles");
@@ -213,7 +240,7 @@ public class Tileboard : MonoBehaviour
                     tilescripts[x, y] = thisTilescript;
                 }
 
-                tilescripts[x, y].vison = Tilescript.visionState.hidden;
+                //tilescripts[x, y].vison = Tilescript.visionState.unknown;
 
             }
         }
@@ -224,15 +251,15 @@ public class Tileboard : MonoBehaviour
 
     public void TickAllAutomatedActors()
     {
-        //tick all non-manual actors
+        //TODO:tick all non-manual actors
     }
 
     private void Update()
     {
-
+        float lookDist = 5f;//temp var 
         if (!initalLook)
         {
-            initalLook = CalculateVisibility(5f);
+            initalLook = CalculateVisibility(lookDist);
         }
 
         if (Input.mouseScrollDelta.y != 0f)
@@ -240,99 +267,58 @@ public class Tileboard : MonoBehaviour
             targetXrot = Mathf.Clamp(targetXrot + Input.mouseScrollDelta.y * 5f, -90, 0f);
         }
 
-        if (!pathfinding)
+        if (Vector2.Distance(dragOffset, targetDragOffset) != 0)
         {
-
-            if (Input.GetKeyDown(KeyCode.J))
+            dragOffset = Vector2.Lerp(dragOffset, targetDragOffset, 0.2f);
+            if (Vector2.Distance(dragOffset, targetDragOffset) < 0.02f)
             {
-                playerActor.PickupItemOnTile(0);
+                dragOffset = targetDragOffset;
             }
 
-            if (Input.GetKeyDown(KeyCode.W))
-            {
-                playerActor.SetPosition(playerActor.x, playerActor.y + 1);
-                CalculateVisibility(5f);
-            }
-            if (Input.GetKeyDown(KeyCode.S))
-            {
-                playerActor.SetPosition(playerActor.x, playerActor.y - 1);
-                CalculateVisibility(5f);
-            }
-            if (Input.GetKeyDown(KeyCode.A))
-            {
-                playerActor.SetPosition(playerActor.x - 1, playerActor.y);
-                CalculateVisibility(5f);
-            }
-            if (Input.GetKeyDown(KeyCode.D))
-            {
-                playerActor.SetPosition(playerActor.x + 1, playerActor.y);
-                CalculateVisibility(5f);
-            }
+        }
 
-            if (Input.GetKeyDown(KeyCode.Keypad1))
+        if (!pathfinding && acceptingInput)
+        {
+            if (Input.GetButtonDown("east"))
             {
-                if (playerActor.MoveDirection(direction.SW) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.E) == 1) { TickAllAutomatedActors(); }
             }
-            if (Input.GetKeyDown(KeyCode.Keypad2))
+            else if (Input.GetButtonDown("southeast"))
             {
-                if (playerActor.MoveDirection(direction.S) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.SE) == 1) { TickAllAutomatedActors(); }
             }
-            if (Input.GetKeyDown(KeyCode.Keypad3))
+            else if (Input.GetButtonDown("south"))
             {
-                if (playerActor.MoveDirection(direction.SE) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.S) == 1) { TickAllAutomatedActors(); }
             }
-            if (Input.GetKeyDown(KeyCode.Keypad4))
+            else if (Input.GetButtonDown("southwest"))
             {
-                if (playerActor.MoveDirection(direction.W) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.SW) == 1) { TickAllAutomatedActors(); }
             }
-            if (Input.GetKeyDown(KeyCode.Keypad6))
+            else if (Input.GetButtonDown("west"))
             {
-                if (playerActor.MoveDirection(direction.E) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.W) == 1) { TickAllAutomatedActors(); }
             }
-            if (Input.GetKeyDown(KeyCode.Keypad7))
+            else if (Input.GetButtonDown("northwest"))
             {
-                if (playerActor.MoveDirection(direction.NW) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.NW) == 1) { TickAllAutomatedActors(); }
             }
-            if (Input.GetKeyDown(KeyCode.Keypad8))
+            else if (Input.GetButtonDown("north"))
             {
-                if (playerActor.MoveDirection(direction.N) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.N) == 1) { TickAllAutomatedActors(); }
             }
-            if (Input.GetKeyDown(KeyCode.Keypad9))
+            else if (Input.GetButtonDown("northeast"))
             {
-                if (playerActor.MoveDirection(direction.NE) == 1) {
-                    TickAllAutomatedActors();
-                }
-                CalculateVisibility(5f);
+                if (playerActor.MoveDirection(direction.NE) == 1) { TickAllAutomatedActors(); }
             }
-            
+            CalculateVisibility(lookDist);
         }
         else
         {//pathfinding
             if (pathfindingTick > pathfindingDelay)
             {
                 pathfindingTick = 0;
-                
+
                 if (playerActor.pathfindingInstruction.Count < 1)
                 {
                     pathfinding = false;
@@ -340,7 +326,7 @@ public class Tileboard : MonoBehaviour
                 else
                 {
                     playerActor.PathfindTick();
-                    CalculateVisibility(5f);
+                    CalculateVisibility(lookDist);
 
                     TickAllAutomatedActors();
                 }
@@ -352,20 +338,35 @@ public class Tileboard : MonoBehaviour
         }
 
         RotationTick();
-        
-        if (Input.GetMouseButtonDown(0))//left click moves to tile
+
+        if (Input.GetMouseButtonDown(0) && acceptingInput)
         {
+            clickPosition = Input.mousePosition;
+            dragging = false;
+        }
+
+
+        if (Input.GetMouseButtonUp(0) && acceptingInput)//left click moves to tile
+        {
+            if (dragging)
+            {
+                Debug.Log("FAFAFA:");
+                dragging = false;
+                return;
+            }
+            Debug.Log("selected");
             RaycastHit hit;
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out hit, 500f))
             {
-                if (hit.transform!= null)
+                if (hit.transform != null)
                 {
                     Tilescript hitScript = hit.transform.gameObject.GetComponent<Tilescript>();
+                    print("moving to a tile, vision state: " + hitScript.vison.ToString());
                     if (hitScript != null && hitScript.passable && hitScript.vison != Tilescript.visionState.unknown)
                     {
                         aStar.UpdatePathfinder();
-                        playerActor.pathfindingInstruction = aStar.fullPathfind(playerActor.x,playerActor.y,hitScript.x,hitScript.y);
+                        playerActor.pathfindingInstruction = aStar.fullPathfind(playerActor.x, playerActor.y, hitScript.x, hitScript.y);
                         pathfinding = true;
                         hitScript.Bounce();
                     }
@@ -373,7 +374,26 @@ public class Tileboard : MonoBehaviour
             }
         }
 
-        if (Input.GetMouseButtonDown(1))//right click displays items
+        if (Input.GetMouseButton(0) && acceptingInput)
+        {
+            if (!dragging)
+            {
+                if (Vector3.Distance(clickPosition, Input.mousePosition) > maximumDragDistance)
+                {
+                    dragging = true;
+                }
+            }
+            if (dragging)
+            {
+                targetDragOffset = (Input.mousePosition - clickPosition) * panMult;
+            }
+        }
+        else
+        {
+            dragging = false;
+        }
+
+        if (Input.GetMouseButtonDown(1) && acceptingInput)//right click displays items
         {
             RaycastHit hit;
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -382,13 +402,13 @@ public class Tileboard : MonoBehaviour
                 if (hit.transform != null)
                 {
                     Tilescript hitScript = hit.transform.gameObject.GetComponent<Tilescript>();
-                    if (hitScript != null && hitScript.itemsOnTile!=null && hitScript.itemsOnTile.items.Count > 0 && hitScript.vison == Tilescript.visionState.visible)
+                    if (hitScript != null && hitScript.itemsOnTile != null && hitScript.itemsOnTile.items.Count > 0 && hitScript.vison == Tilescript.visionState.visible)
                     {
                         string printstring = "This tile contains:\n";
                         List<InventoryItem> items = hitScript.itemsOnTile.items;
                         for (int i = 0; i < items.Count; i++)
                         {
-                            printstring += items[i].name + "\n"; 
+                            printstring += items[i].name + "\n";
                         }
                         print(printstring);
                     }
@@ -396,16 +416,15 @@ public class Tileboard : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.I))//pick up item
+        if (Input.GetButtonDown("PickUp") && acceptingInput)
         {
             playerActor.PickupItemOnTile(0);
-            print(playerActor.inventory.Count);
+            inventoryUpdated(playerActor.inventory);
         }
-
-        if (Input.GetKeyDown(KeyCode.K))//drop item
+        if (Input.GetButtonDown("Drop") && acceptingInput)
         {
             playerActor.DropItemOnTile(0);
-            print(playerActor.inventory.Count);
+            inventoryUpdated(playerActor.inventory);
         }
 
     }
@@ -427,7 +446,7 @@ public class Tileboard : MonoBehaviour
     {
         List<RaycastHit> colliders;
         Vector3 center = tileObjs[playerActor.x, playerActor.y].transform.position;
-        colliders = new List<RaycastHit>( Physics.CapsuleCastAll(center + Vector3.back, center + Vector3.forward,sight+.1f,Vector3.forward));
+        colliders = new List<RaycastHit>(Physics.CapsuleCastAll(center + Vector3.back, center + Vector3.forward, sight + .1f, Vector3.forward));
         if (colliders.Count < 1)
         {
             return false;
@@ -446,7 +465,7 @@ public class Tileboard : MonoBehaviour
             }
 
 
-            if (LineOfSightToTile(playerActor.x, playerActor.y, tile.x, tile.y,raycastMask))
+            if (LineOfSightToTile(playerActor.x, playerActor.y, tile.x, tile.y, raycastMask))
             {
                 newVisibleTiles.Add(tile);
                 setTileColor(tile.x, tile.y, Color.white);
@@ -485,17 +504,17 @@ public class Tileboard : MonoBehaviour
         RaycastHit hit;
         Vector3 start = tileObjs[startx, starty].transform.position + Vector3.back * .5f;
         Vector3 end = tileObjs[endx, endy].transform.position + Vector3.back * .5f;
-        
+
 
         if (Mathf.Abs(startx - endx) == Mathf.Abs(starty - endy))
         {
             int dx = endx - startx;
             int dy = endy - starty;
-            Vector2 dir = new Vector2(0,0);
-            if (dx>0 && dy > 0)
+            Vector2 dir = new Vector2(0, 0);
+            if (dx > 0 && dy > 0)
             {//NE
                 dir = new Vector2(1, 1);
-            }else if(dx < 0 && dy > 0)
+            } else if (dx < 0 && dy > 0)
             {//NW
                 dir = new Vector2(-1, 1);
             }
@@ -507,24 +526,24 @@ public class Tileboard : MonoBehaviour
             {//SW
                 dir = new Vector2(-1, -1);
             }
-            
+
             for (int i = 0; i < Mathf.Abs(dx); i++)
             {
                 int castTileX = Mathf.FloorToInt(startx + Mathf.Sign(dir.x) * i);
                 int castTileY = Mathf.FloorToInt(starty + Mathf.Sign(dir.y) * i);
 
-                if ((!tilescripts[Mathf.FloorToInt(castTileX + Mathf.Sign(dir.x)), castTileY].passable && !tilescripts[castTileX, Mathf.FloorToInt(castTileY + Mathf.Sign(dir.y))].passable) || !tilescripts[castTileX,castTileY].passable)
+                if ((!tilescripts[Mathf.FloorToInt(castTileX + Mathf.Sign(dir.x)), castTileY].passable && !tilescripts[castTileX, Mathf.FloorToInt(castTileY + Mathf.Sign(dir.y))].passable) || !tilescripts[castTileX, castTileY].passable)
                 {
-                    return false;  
+                    return false;
                 }
             }
             return true;
         }
 
 
-        Ray sight = new Ray(start,end-start);
-        
-        if ( !Physics.Raycast(sight, out hit, Vector3.Distance(start,end) ,mask))
+        Ray sight = new Ray(start, end - start);
+
+        if (!Physics.Raycast(sight, out hit, Vector3.Distance(start, end), mask))
         {
             Debug.DrawLine(start, end, Color.red, 20f);
             return true;
@@ -543,7 +562,7 @@ public class Tileboard : MonoBehaviour
 
     public GameObject InstantiateItem(int x, int y, InventoryItem item)
     {
-        if (tilescripts[x,y].itemsOnTile != null)
+        if (tilescripts[x, y].itemsOnTile != null)
         {
             //obj exists, add to it
             tilescripts[x, y].itemsOnTile.items.Add(item.ItemClone());
@@ -559,6 +578,6 @@ public class Tileboard : MonoBehaviour
             spawn.transform.localPosition = new Vector3((float)x, (float)y, -0.5f);
             tilescripts[x, y].itemsOnTile = spawnedItem;
             return spawn;
-        }     
+        }
     }
 }

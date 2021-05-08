@@ -27,50 +27,18 @@ public class TileActorScript : MonoBehaviour
 
 public class tileActor
 {
-    string name = "default dude";
-    GameObject refrenceObject;
+    public string name = "default dude";
+    public GameObject refrenceObject;
     public TileActorScript tileActorScript;
-    Tileboard tileboardReference;
-    Sprite image;
-    int xCord;
-    int yCord;
+    public Tileboard tileboardReference;
+    public Sprite image;
+    public int xCord;
+    public int yCord;
 
     public List<Tileboard.direction> pathfindingInstruction;
     public List<InventoryItem> inventory;
-
-    huntStatusContainer huntStatus;
-
-    public enum ControlMode
-    {
-        manual,
-        hunt
-    }
-
-    public struct huntStatusContainer
-    {
-        public TileActorScript huntedTarget;
-        public enum huntStatus
-        {
-            wander,
-            chase,
-            search,
-        }
-        public huntStatus status;
-        public int timer;
-        public int wanderTimerMax;
-        public int chaseTimerMax;
-        public int searchTimerMax;
-        public huntStatusContainer(TileActorScript target, int startingtime, int wandertime, int chasetime, int searchtime, huntStatus currentstatus )
-        {
-            huntedTarget = target;
-            status = currentstatus;
-            timer = startingtime;
-            wanderTimerMax = wandertime;
-            chaseTimerMax = chasetime;
-            searchTimerMax = searchtime;
-        }
-    }
-
+    public equipment[] equips =  new equipment[DamageSystem.equipPosition.GetNames(typeof(DamageSystem.equipPosition)).Length];
+    
     //stats
     public int maxHP
     {
@@ -89,7 +57,7 @@ public class tileActor
     public int stat_int;//magic damage, skillpoints to unlock skills/feats for stats
     public int stat_wis;//magic accuracy and item usage proficency
 
-
+    public tileActor() { }//don't remove, C# is weird
     public tileActor(int xPos, int yPos, Sprite sprite, GameObject gameObject, Tileboard tileboard, int HP, int str, int dex, int intel, int wis)
     {
         image = sprite;
@@ -110,8 +78,7 @@ public class tileActor
         inventory = new List<InventoryItem>();
 
         inventory.Add(new WeaponItem(0, "Fists", false, DamageSystem.damageType.blunt, 1.2f, 5, 1));
-
-        WeaponItem equippedWeapon = inventory[0] as WeaponItem;
+        EquipItem(inventory[0] as WeaponItem, DamageSystem.equipPosition.RightHand);
     }
 
     public void SetPosition(int newXCord, int newYCord)
@@ -311,6 +278,7 @@ public class tileActor
         {
             //TODO: CALCULATE CHANCE TO HIT
             //TODO: ADD WEAPON EFFECTS
+            //TODO: ADD WARNING IF FRIENDLY
             tileboardReference.tilescripts[targX, targY].actorOnTile.ReceiveDamage(DamageSystem.CalcDamage(weapon, this));
         }
 
@@ -371,7 +339,7 @@ public class tileActor
 
     public void Killed()
     {
-        //do something
+        //TODO: do something and remove
     }
 
     public GameObject gameObject
@@ -386,5 +354,95 @@ public class tileActor
     public int y
     {
         get { return yCord; }
+    }
+
+    public bool CheckIfCanEquip(equipment item, DamageSystem.equipPosition equipPos)
+    {
+        if (item.equipablePositions.Contains(equipPos))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    public void EquipItem(equipment item,DamageSystem.equipPosition equipPos)
+    {
+        int equipSlot = (int)equipPos;
+        if (equips[equipSlot] == null)
+        {//no equipment in slot
+            equips[equipSlot] = item;
+            item.equippedPosition = equipPos;
+        }
+        else
+        {//replace item
+            Debug.Log(equips[equipSlot].ToString());
+            equips[equipSlot].equippedPosition = null;
+            equips[equipSlot] = item;
+            item.equippedPosition = equipPos;
+        }
+    }
+}
+
+
+public class autoTileActor : tileActor
+{
+    huntStatusContainer huntStatus;
+
+    public autoTileActor(int xPos, int yPos, Sprite sprite, GameObject gameObject, Tileboard tileboard, int HP, int str, int dex, int intel, int wis)
+    {
+        image = sprite;
+        refrenceObject = gameObject;
+        tileboardReference = tileboard;
+        SetPosition(xPos, yPos);
+        tileActorScript = gameObject.GetComponent<TileActorScript>();
+
+        stat_HP = HP;
+        stat_str = str;
+        stat_dex = dex;
+        stat_int = intel;
+        stat_wis = wis;
+
+        currentHP = maxHP;
+
+        pathfindingInstruction = new List<Tileboard.direction>();
+        inventory = new List<InventoryItem>();
+
+        inventory.Add(new WeaponItem(0, "Fists", false, DamageSystem.damageType.blunt, 1.2f, 5, 1));
+
+        WeaponItem equippedWeapon = inventory[0] as WeaponItem;
+    }
+
+    public enum ControlMode
+    {
+        manual,
+        hunt
+    }
+
+    public struct huntStatusContainer
+    {
+        public TileActorScript huntedTarget;
+        public enum huntStatus
+        {
+            wander,
+            chase,
+            search,
+        }
+        public huntStatus status;
+        public int timer;
+        public int wanderTimerMax;
+        public int chaseTimerMax;
+        public int searchTimerMax;
+        public huntStatusContainer(TileActorScript target, int startingtime, int wandertime, int chasetime, int searchtime, huntStatus currentstatus)
+        {
+            huntedTarget = target;
+            status = currentstatus;
+            timer = startingtime;
+            wanderTimerMax = wandertime;
+            chaseTimerMax = chasetime;
+            searchTimerMax = searchtime;
+        }
     }
 }
