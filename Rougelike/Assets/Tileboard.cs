@@ -254,6 +254,24 @@ public class Tileboard : MonoBehaviour
         //TODO:tick all non-manual actors
     }
 
+    #region player references
+
+    public void PlayerDrop(int index)
+    {
+        playerActor.DropItemOnTile(index);
+    }
+
+    public void PlayerPickUp(int index)
+    {
+        playerActor.PickupItemOnTile(index);
+    }
+
+    public void PlayerEquip(int itemIndex, int equipPositionIndex)
+    {
+        
+    }
+    #endregion
+
     private void Update()
     {
         float lookDist = 5f;//temp var 

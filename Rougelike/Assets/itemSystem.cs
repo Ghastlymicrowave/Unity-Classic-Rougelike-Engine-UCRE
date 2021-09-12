@@ -8,7 +8,7 @@ public class InventoryItem
     public bool canBeDropped;
     public string description = "";
     public virtual bool equipable { get { return false; } }
-
+    public List<DamageSystem.itemInteractions> interactions;
     public void Set(int itemValue, string itemName, bool droppable, string itemDescription)
     {
         value = itemValue;
@@ -24,7 +24,13 @@ public class InventoryItem
         dupe.value = value;
         dupe.name = string.Copy(name);
         dupe.canBeDropped = canBeDropped;
+        dupe.interactions = interactions;
         return dupe;
+    }
+
+    public void SetInteractions(List<DamageSystem.itemInteractions> newInteractions)
+    {
+        interactions = newInteractions;
     }
 }
 
@@ -59,6 +65,9 @@ public class ConsumableEffectItem : ConsumableItem//lacking a clone
         tickMode = effectTickMode;
         initalIntensity = effectIntensity;
         duration = effectDuration;
+        interactions = new List<DamageSystem.itemInteractions>();
+        interactions.Add(DamageSystem.itemInteractions.Consume);
+        interactions.Add(DamageSystem.itemInteractions.Drop);
     }
 
     public ConsumableEffectItem(int goldValue, string itemName, bool droppable, DamageSystem.effect consumableEffect, DamageSystem.effectTickMode effectTickMode, int effectIntensity, int effectIntensityEnd, int effectDuration)
@@ -72,6 +81,9 @@ public class ConsumableEffectItem : ConsumableItem//lacking a clone
         initalIntensity = effectIntensity;
         endingIntensity = effectIntensityEnd;
         duration = effectDuration;
+        interactions = new List<DamageSystem.itemInteractions>();
+        interactions.Add(DamageSystem.itemInteractions.Consume);
+        interactions.Add(DamageSystem.itemInteractions.Drop);
     }
 }
 
@@ -88,6 +100,9 @@ public class InstantEffectItem : ConsumableItem //lacking a clone
         canBeDropped = droppable;
         effect = instantEffect;
         intensity = effectIntensity;
+        interactions = new List<DamageSystem.itemInteractions>();
+        interactions.Add(DamageSystem.itemInteractions.Consume);
+        interactions.Add(DamageSystem.itemInteractions.Drop);
     }
 
 
@@ -133,10 +148,13 @@ public class WeaponItem : equipment
         equipablePositions = new List<DamageSystem.equipPosition>();
         equipablePositions.Add(DamageSystem.equipPosition.RightHand);
         equipablePositions.Add(DamageSystem.equipPosition.LeftHand);
+        interactions = new List<DamageSystem.itemInteractions>();
+        interactions.Add(DamageSystem.itemInteractions.Equip);
+        interactions.Add(DamageSystem.itemInteractions.Drop);
     }
 
     public override InventoryItem ItemClone()
-    {
+    {//don't know if this is even needed
         WeaponItem dupe = (WeaponItem)this.MemberwiseClone();
         dupe.value = value;
         dupe.name = string.Copy(name);
@@ -148,6 +166,7 @@ public class WeaponItem : equipment
         equipablePositions = new List<DamageSystem.equipPosition>();
         equipablePositions.Add(DamageSystem.equipPosition.RightHand);
         equipablePositions.Add(DamageSystem.equipPosition.LeftHand);
+        dupe.interactions = interactions;
         return dupe;
     }
 }

@@ -370,6 +370,7 @@ public class tileActor
 
     public void EquipItem(equipment item,DamageSystem.equipPosition equipPos)
     {
+        if (!CheckIfCanEquip(item, equipPos)) { Debug.LogError("cannot equip item "+item.name+" in slot "+equipPos.ToString()); return; }
         int equipSlot = (int)equipPos;
         if (equips[equipSlot] == null)
         {//no equipment in slot

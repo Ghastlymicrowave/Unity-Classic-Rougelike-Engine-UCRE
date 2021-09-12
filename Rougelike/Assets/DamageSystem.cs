@@ -6,6 +6,14 @@ public class DamageSystem
 {
     public const int hitpointsPerHP = 10;
 
+    public enum itemInteractions
+    {
+        Use,
+        Consume,
+        Equip,
+        Drop
+        //TODO: add throw
+    }
     public enum effect
     {
         speed,

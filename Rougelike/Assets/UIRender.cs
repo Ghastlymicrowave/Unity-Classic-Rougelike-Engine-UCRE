@@ -14,19 +14,27 @@ public class UIRender : MonoBehaviour
     Text HUDInventoryText;
     public GameObject MENUInventory;
     Text MENUInventoryText;
+    public GameObject MENUInventoryMenuOption;
+    Text MENUInventoryMenuOptionText;
 
     int? cursorPosition = null;
+    int? optionCursorPosition = null;
+    InventoryItem selectedItem;
     public enum UIPanels
     {
         HUDInventory,
-        InventoryMenu
+        InventoryMenu,
+        InventoryMenuOption
     }
 
-    // Start is called before the first frame update
+    UIPanels? selectedPanel;
+
+    // in time replace each individual object with positions in an array of gameobjects, next to an array of text objects
     void Start()
     {
         HUDInventoryText = HUDInventory?.transform.GetChild(0).GetComponent<Text>();
         MENUInventoryText = MENUInventory?.transform.GetChild(0).GetComponent<Text>();
+        MENUInventoryMenuOptionText = MENUInventoryMenuOption?.transform.GetChild(0).GetComponent<Text>();
 
         tileboard = GetComponent<Tileboard>();
         tileboard.inventoryUpdated = (List<InventoryItem> iv) => { this.PlayerInventoryUpdated(iv); };
@@ -39,9 +47,11 @@ public class UIRender : MonoBehaviour
         switch (panel)
         {
             case UIPanels.HUDInventory: 
-                if (HUDInventory != null) { return HUDInventory.gameObject; } else goto default;
+                if (HUDInventory != null) { return HUDInventory; } else goto default;
             case UIPanels.InventoryMenu: 
-                if (MENUInventory != null) { return MENUInventory.gameObject; } else goto default;
+                if (MENUInventory != null) { return MENUInventory; } else goto default;
+            case UIPanels.InventoryMenuOption:
+                if (MENUInventoryMenuOption != null) { return MENUInventoryMenuOption; } else goto default;
             default:
                 Debug.LogWarning("no panel for " + panel.ToString() + " found, returned null"); 
                 return null;
@@ -121,6 +131,17 @@ public class UIRender : MonoBehaviour
         MENUInventoryText.text = outstring;
     }
 
+    public void UpdateOptionsUI(InventoryItem item)
+    {
+        if (optionCursorPosition == null || optionCursorPosition < 0) { optionCursorPosition = 0; }
+        if (optionCursorPosition > item.interactions.Count - 1) { optionCursorPosition = item.interactions.Count - 1; }
+        string outstring = "";
+        for(int i = 0; i < item.interactions.Count; i++)
+        {
+            if (optionCursorPosition == i) { outstring += ">>> "; } else { outstring += "       "; }
+        }
+    }
+
     private void Update()
     {
         if (Input.GetButtonDown("Inventory"))
@@ -129,26 +150,79 @@ public class UIRender : MonoBehaviour
             {
                 ActivateOnlyThisPanel(UIPanels.HUDInventory);
                 tileboard.acceptingInput = true;
+                selectedPanel = null;
             }
             else if (GetPanelOrNull(UIPanels.InventoryMenu)!=null)
             {
                 ActivateOnlyThisPanel(UIPanels.InventoryMenu);
                 tileboard.acceptingInput = false;
                 UpdateInventoryUI();
+                selectedPanel = UIPanels.InventoryMenu;
             }
         }
 
-        if (GetPanelOrNull(UIPanels.InventoryMenu)?.activeSelf ?? false)
+        switch (selectedPanel)
         {
-            if (Input.GetButtonDown("north"))
-            {
-                cursorPosition -= 1;
-                UpdateInventoryUI();
-            }else if (Input.GetButtonDown("south"))
-            {
-                cursorPosition += 1;
-                UpdateInventoryUI();
-            }
+            case UIPanels.InventoryMenu:
+                if (Input.GetButtonDown("north"))
+                {
+                    cursorPosition -= 1;
+                    UpdateInventoryUI();
+                }
+                else if (Input.GetButtonDown("south"))
+                {
+                    cursorPosition += 1;
+                    UpdateInventoryUI();
+                }
+                if (Input.GetButtonDown("Submit"))
+                {
+                    SetPanelActive(UIPanels.InventoryMenuOption, true);
+                    selectedPanel = UIPanels.InventoryMenuOption;
+                    selectedItem = inventory[cursorPosition ?? 0];
+                }
+                if (Input.GetButtonDown("Cancel"))
+                {
+                    ActivateOnlyThisPanel(UIPanels.HUDInventory);
+                    tileboard.acceptingInput = true;
+                    selectedPanel = null;
+                }
+                break;
+            case UIPanels.InventoryMenuOption:
+                if (Input.GetButtonDown("north"))
+                {
+                    optionCursorPosition -= 1;
+                    UpdateOptionsUI(selectedItem);
+                }
+                else if (Input.GetButtonDown("south"))
+                {
+                    optionCursorPosition += 1;
+                    UpdateOptionsUI(selectedItem);
+                }
+                if (Input.GetButtonDown("Submit"))
+                {
+                    //do the selected thing
+                    switch (selectedItem.interactions[optionCursorPosition??0])
+                    {
+                        case DamageSystem.itemInteractions.Use://do something highly specific per item
+                            break;
+                        case DamageSystem.itemInteractions.Consume://apply effects
+                            break;
+                        case DamageSystem.itemInteractions.Equip://equip item
+                            tileboard.PlayerEquip(optionCursorPosition ?? 0,);
+                            break;
+                        case DamageSystem.itemInteractions.Drop://drop item
+                            tileboard.PlayerDrop(optionCursorPosition??0);
+                            break;
+                    }
+                }
+                if (Input.GetButtonDown("Cancel"))
+                {
+                    ActivateOnlyThisPanel(UIPanels.InventoryMenu);
+                    tileboard.acceptingInput = false;
+                    UpdateInventoryUI();
+                    selectedPanel = UIPanels.InventoryMenu;
+                }
+                break;
         }
     }
 }
